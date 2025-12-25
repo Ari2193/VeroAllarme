@@ -36,6 +36,9 @@ data/test_*.json
 data/visualization_*.jpg
 data/batch_test_results.json
 data/relevance_outputs/
+data/pipeline_outputs/
+data/full_pipeline_outputs/
+data/test_outputs/
 
 # Model checkpoints (large files)
 backend/model_checkpoints/*.pth
