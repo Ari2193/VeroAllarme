@@ -35,6 +35,15 @@ data/test_*.jpg
 data/test_*.json
 data/visualization_*.jpg
 data/batch_test_results.json
+data/relevance_outputs/
+
+# Model checkpoints (large files)
+backend/model_checkpoints/*.pth
+!backend/model_checkpoints/.gitkeep
+
+# Training logs
+backend/logs/training/
+*.tfevents.*
 
 # Training data (optional - remove this line if you want to commit training data)
 # data/training/
