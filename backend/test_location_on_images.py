@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import cv2
 import random
+import pytest
 from core.location_relevance import LocationRelevancePredictor
 
 print("=" * 80)
@@ -19,7 +20,11 @@ predictor = LocationRelevancePredictor(camera_name="Factory")
 print("✓ Model loaded\n")
 
 # Find all images
-data_dir = Path("../data/training/camera-events/Factory")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+data_dir = REPO_ROOT / "data" / "training" / "camera-events" / "Factory"
+
+if not data_dir.exists():
+    pytest.skip(f"Missing data directory: {data_dir}", allow_module_level=True)
 all_images = []
 
 for event_dir in data_dir.iterdir():

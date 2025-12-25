@@ -220,6 +220,10 @@ class ContrastiveMotionDataset(Dataset):
         negative_img = cv2.imread(negative_seq["images"][negative_idx])
         negative_img = cv2.cvtColor(negative_img, cv2.COLOR_BGR2RGB)
         
+        # Populate detection cache for anchor sequence when enabled
+        if self.cache_detections:
+            _ = self._get_motion_result(anchor_seq["images"])
+
         # Apply augmentations
         anchor_tensor = self.transform(anchor_img)
         positive_tensor = self.transform(positive_img)

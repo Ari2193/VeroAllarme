@@ -6,11 +6,18 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.motion_detection import MotionDetector
 import json
+import pytest
+from core.motion_detection import MotionDetector
+
+# Resolve repo root and data path (Factory camera events)
+REPO_ROOT = Path(__file__).resolve().parents[2]
+base_path = REPO_ROOT / "data" / "training" / "camera-events" / "Factory"
+
+if not base_path.exists():
+    pytest.skip(f"Missing data directory: {base_path}", allow_module_level=True)
 
 # Find first available event
-base_path = Path("../data/training/camera-events/Factory")
 event_dirs = sorted([d for d in base_path.iterdir() if d.is_dir()])
 
 if not event_dirs:
@@ -59,8 +66,8 @@ vis = detector.visualize_motion(
 
 print(f"\n✓ Visualization saved to: {output_path}")
 
-# Save JSON
-json_path = "../data/test_result.json"
+# Save JSON in repo data folder
+json_path = REPO_ROOT / "data" / "test_result.json"
 with open(json_path, 'w') as f:
     json.dump(result.to_dict(), f, indent=2)
 
