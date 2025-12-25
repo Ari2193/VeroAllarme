@@ -67,14 +67,14 @@ class MockAnomalyDetector:
 
 
 class MockYOLODetector:
-    """Mock Stage 5 YOLO detector."""
+    """Mock Stage 5 YOLO detector matching YoloProcessor API."""
     
-    def detect(self, image, confidence=0.6):
-        return {
-            "detections": [
-                {"class": "person", "confidence": 0.95, "bbox": [10, 20, 100, 150]},
-            ]
-        }
+    def detect_objects(self, image, conf_threshold=0.5):
+        """Match YoloProcessor.detect_objects() signature."""
+        return [
+            {"class": "person", "confidence": 0.95, "bbox": [10, 20, 100, 150]},
+        ]
+
 
 
 def create_dummy_images(h=480, w=640, c=3):
@@ -195,7 +195,7 @@ class TestAlertProcessingPipeline:
         assert result["alert_id"] == "alert_004"
     
     def test_alert_stage_4_pass_with_cold_zone(self, pipeline_components):
-        """Test Stage 4 PASS with Stage 3 cold zone → ESCALATE."""
+        """Test Stage 4 PASS with Stage 3 cold zone → ESCALATE + Stage 5 YOLO."""
         pipeline_components["anomaly_detector"] = MockAnomalyDetector(decision="PASS")
         pipeline = create_pipeline(**pipeline_components)
         
@@ -211,9 +211,13 @@ class TestAlertProcessingPipeline:
         )
         
         # Stage 3 returns heat_zone='cold' → next_stage=5
-        # Stage 4 PASS → Use Stage 3 hint → ESCALATE
+        # Stage 4 PASS → Use Stage 3 hint → ESCALATE + Run Stage 5
         assert result["final_decision"] == "ESCALATE"
-        assert "Stage 3 hint: heat_zone='cold'" in result["explanation"]
+        assert "Stage 3: heat_zone='cold'" in result["explanation"]
+        assert "Stage 5 (YOLO)" in result["explanation"]
+        # Verify Stage 5 was called
+        assert result["stage_5_result"] is not None
+        assert result["stage_5_result"]["num_objects"] == 1
 
 
 if __name__ == "__main__":
