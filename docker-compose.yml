@@ -1,0 +1,151 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: veroallarme_postgres
+    environment:
+      POSTGRES_DB: veroallarme
+      POSTGRES_USER: veroallarme
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veroallarme"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - veroallarme_network
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: veroallarme_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - veroallarme_network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: veroallarme_backend
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./models:/app/models
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://veroallarme:password@postgres:5432/veroallarme
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DEBUG=True
+      - YOLO_DEVICE=cpu
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - veroallarme_network
+
+  # Celery Worker for YOLO Processing
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: veroallarme_celery_worker
+    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - DATABASE_URL=postgresql://veroallarme:password@postgres:5432/veroallarme
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - YOLO_DEVICE=cpu
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - veroallarme_network
+
+  # Celery Flower (Monitoring)
+  celery_flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: veroallarme_flower
+    command: celery -A tasks.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery_worker
+    networks:
+      - veroallarme_network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: veroallarme_frontend
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+    networks:
+      - veroallarme_network
+
+  # NGINX Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: veroallarme_nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - veroallarme_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  veroallarme_network:
+    driver: bridge
