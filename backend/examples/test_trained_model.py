@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import cv2
 import numpy as np
+import pytest
 from core.motion_detection import MotionDetector
 from core.relevance_mask import RelevanceMaskPredictor
 
@@ -16,19 +17,28 @@ print("=" * 80)
 print("🧪 Testing Trained Model")
 print("=" * 80)
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+data_dir = REPO_ROOT / "data" / "training" / "camera-events" / "Factory"
+model_path = REPO_ROOT / "backend" / "model_checkpoints" / "quick_complete.pth"
+
+if not data_dir.exists():
+    pytest.skip(f"Missing data directory: {data_dir}", allow_module_level=True)
+
+if not model_path.exists():
+    pytest.skip(f"Missing trained model checkpoint: {model_path}", allow_module_level=True)
+
 # Initialize detectors
 motion_detector = MotionDetector()
 
 # Test both models
 untrained_predictor = RelevanceMaskPredictor()  # Random weights
 trained_predictor = RelevanceMaskPredictor(
-    model_path="model_checkpoints/quick_complete.pth"
+    model_path=str(model_path)
 )
 
 print("\n✓ Loaded models (trained vs untrained)")
 
 # Test on multiple events
-data_dir = Path("../data/training/camera-events/Factory")
 event_dirs = sorted([d for d in data_dir.iterdir() if d.is_dir()])[:5]
 
 print(f"\n📋 Testing on {len(event_dirs)} events...")

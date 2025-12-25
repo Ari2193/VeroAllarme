@@ -39,11 +39,14 @@ class AlertProcessingPipeline:
     
     def __init__(
         self,
-        heatmap_filter,  # FilterHeatMap instance from Stage 3
-        anomaly_detector,  # AnomalyDetector instance from Stage 4
+        heatmap_filter=None,  # legacy name
+        anomaly_detector=None,  # AnomalyDetector instance from Stage 4
         yolo_detector=None,  # YOLOv8 detector for Stage 5 (optional)
+        *,
+        heat_map_filter=None,  # preferred name expected by tests
     ):
-        self.heatmap_filter = heatmap_filter
+        # Accept both heatmap_filter and heat_map_filter
+        self.heatmap_filter = heat_map_filter if heat_map_filter is not None else heatmap_filter
         self.anomaly_detector = anomaly_detector
         self.yolo_detector = yolo_detector
     
@@ -77,6 +80,7 @@ class AlertProcessingPipeline:
             "alert_id": alert_id,
             "camera_id": camera_id,
             "timestamp": datetime.now().isoformat(),
+            "num_images": len(images),
             "stage_3_result": None,
             "stage_4_result": None,
             "stage_5_result": None,
@@ -104,17 +108,28 @@ class AlertProcessingPipeline:
         
         # ========== STAGE 4: Memory-based Anomaly Detection ==========
         try:
-            stage4_result = self.anomaly_detector.detect(
-                camera_id=camera_id,
-                images=images,
-                motion_boxes=motion_boxes,
-                top_k=10,
-            )
+            if hasattr(self.anomaly_detector, "detect"):
+                stage4_result = self.anomaly_detector.detect(
+                    camera_id=camera_id,
+                    images=images,
+                    motion_boxes=motion_boxes,
+                    top_k=10,
+                )
+            elif hasattr(self.anomaly_detector, "process_alert"):
+                stage4_result = self.anomaly_detector.process_alert(
+                    camera_id=camera_id,
+                    alert_id=alert_id,
+                    images=images,
+                    motion_mask=motion_mask,
+                    motion_boxes=motion_boxes,
+                )
+            else:
+                raise AttributeError("Anomaly detector missing detect/process_alert")
             result["stage_4_result"] = stage4_result
             
-            event_sim = stage4_result.get("event_sim", 0.0)
-            event_support = stage4_result.get("event_support", 0)
-            stage4_decision = stage4_result.get("decision", "PASS")
+            event_sim = stage4_result.get("event_sim", stage4_result.get("similarity", 0.0))
+            event_support = stage4_result.get("event_support", stage4_result.get("matches_count", 0))
+            stage4_decision = str(stage4_result.get("decision", "PASS")).upper()
             
         except Exception as e:
             result["stage_4_result"] = {"error": str(e)}
@@ -132,8 +147,8 @@ class AlertProcessingPipeline:
         if stage4_decision == "FILTER":
             result["final_decision"] = "ESCALATE"
             result["explanation"] = (
-                f"Stage 4: High similarity ({event_sim:.3f}) with {event_support} "
-                f"past events (anomalous). "
+                f"Stage 3: heat_zone='{heat_zone}'. "
+                f"Stage 4: High similarity ({event_sim:.3f}) with {event_support} past events. "
             )
             run_stage_5 = True  # Stage 4 FILTER → Stage 5
             
@@ -141,8 +156,8 @@ class AlertProcessingPipeline:
         elif stage4_decision == "DROP":
             result["final_decision"] = "DROP"
             result["explanation"] = (
-                f"Stage 4: Low similarity ({event_sim:.3f}); "
-                f"only {event_support} similar neighbors. Novel or false alarm."
+                f"Stage 3: heat_zone='{heat_zone}'. "
+                f"Stage 4: Low similarity ({event_sim:.3f}); only {event_support} similar neighbors."
             )
         
         # Stage 4 PASS → Use Stage 3 hint

@@ -125,7 +125,10 @@ class ContrastiveEncoder(nn.Module):
         
         # Backbone: ResNet-18
         resnet = models.resnet18(pretrained=pretrained)
-        self.backbone = nn.Sequential(*list(resnet.children())[:-1])  # Remove FC layer
+        # Feature maps before avgpool (spatial 7x7 for 224x224 input)
+        self.backbone_no_pool = nn.Sequential(*list(resnet.children())[:-2])
+        # Keep avgpool for classification path
+        self.avgpool = resnet.avgpool
         
         # Projection head for contrastive learning
         self.projection_head = nn.Sequential(
@@ -136,25 +139,30 @@ class ContrastiveEncoder(nn.Module):
         
         self.feature_dim = feature_dim
     
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        x: torch.Tensor,
+        return_spatial: bool = False
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass
+        Forward pass with optional spatial feature maps.
         
         Args:
             x: Input tensor (B, C, H, W)
+            return_spatial: When True, also return spatial feature maps for segmentation.
         
         Returns:
-            features: Backbone features (B, 512)
+            pooled_feats: Pooled features (B, 512)
             projections: Projected features for contrastive loss (B, feature_dim)
+            spatial_feats (optional): Feature maps before pooling (B, 512, H/32, W/32)
         """
-        # Extract features
-        features = self.backbone(x)  # (B, 512, 1, 1)
-        features = features.view(features.size(0), -1)  # (B, 512)
-        
-        # Project for contrastive learning
-        projections = self.projection_head(features)  # (B, feature_dim)
-        
-        return features, projections
+        spatial_feats = self.backbone_no_pool(x)  # e.g., (B, 512, 7, 7)
+        pooled = self.avgpool(spatial_feats)  # (B, 512, 1, 1)
+        pooled_feats = pooled.view(pooled.size(0), -1)  # (B, 512)
+        projections = self.projection_head(pooled_feats)
+        if return_spatial:
+            return pooled_feats, projections, spatial_feats
+        return pooled_feats, projections
 
 
 class RelevanceSegmentationHead(nn.Module):
@@ -305,21 +313,10 @@ class RelevanceMaskModel(nn.Module):
         """
         # Get backbone features (need full feature maps for segmentation)
         if self.mode in ["segmentation", "both"]:
-            # Get intermediate feature maps
-            x_features = x
-            for layer in self.encoder.backbone:
-                x_features = layer(x_features)
-            # x_features shape: (B, 512, 7, 7) for 224x224 input
-            
-            # Get pooled features for classification
-            pooled_features = F.adaptive_avg_pool2d(x_features, (1, 1))
-            pooled_features = pooled_features.view(pooled_features.size(0), -1)
-            
-            # Get projections for contrastive learning
-            projections = self.encoder.projection_head(pooled_features)
+            pooled_features, projections, x_features = self.encoder(x, return_spatial=True)
         else:
-            # Just need pooled features
-            pooled_features, projections = self.encoder(x)
+            # Contrastive/classification only
+            pooled_features, projections = self.encoder(x, return_spatial=False)
             x_features = None
         
         # Return based on mode

@@ -47,10 +47,18 @@ class MotionDetectionResult:
     """Complete motion detection result"""
     motion_detected: bool
     motion_regions: List[MotionRegion]
-    motion_mask: np.ndarray
-    confidence: float
-    total_motion_area: int
-    frame_dimensions: Tuple[int, int]  # (height, width)
+    motion_mask: Optional[np.ndarray] = None
+    confidence: float = 0.0
+    total_motion_area: int = 0
+    frame_dimensions: Tuple[int, int] = (0, 0)  # (height, width)
+    binary_mask: Optional[np.ndarray] = None  # alias for tests
+    
+    def __post_init__(self):
+        # Normalize mask aliases
+        if self.binary_mask is None and self.motion_mask is not None:
+            self.binary_mask = self.motion_mask
+        if self.motion_mask is None and self.binary_mask is not None:
+            self.motion_mask = self.binary_mask
     
     def to_dict(self) -> Dict:
         """Convert to dictionary format for API response"""
