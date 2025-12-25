@@ -1,0 +1,30 @@
+# Model Checkpoints
+
+This directory contains trained model checkpoints for the VeroAllarme relevance mask module.
+
+## Files
+
+After training, you'll find:
+
+- `contrastive_epoch_*.pth` - Checkpoints from Phase 1 (contrastive learning)
+- `contrastive_final.pth` - Final Phase 1 model
+- `segmentation_epoch_*.pth` - Checkpoints from Phase 2 (segmentation)
+- `segmentation_final.pth` - Final Phase 2 model
+- `best_model.pth` - Best performing model (use this for inference)
+- `config_*.yaml` - Training configurations
+
+## Usage
+
+Load a checkpoint for inference:
+
+```python
+from core.relevance_mask import RelevanceMaskPredictor
+
+predictor = RelevanceMaskPredictor(
+    model_path="backend/model_checkpoints/best_model.pth"
+)
+```
+
+## Note
+
+These files are large (~45 MB each) and are excluded from git by default.
