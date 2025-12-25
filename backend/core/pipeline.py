@@ -3,17 +3,21 @@ Alert Processing Pipeline: Stages 3, 4, and 5 integration.
 
 Flow:
 1. Stage 3 (HeatMap) → heat_zone (cold/hot), next_stage decision
-2. Stage 4 (Memory) → event_sim, support, final decision (FILTER/DROP/PASS)
-3. Stage 5 (YOLO) → object detection if routed from Stage 4
+2. Stage 4 (Memory) → event_sim, support, decision (FILTER/DROP/PASS)
+3. Stage 5 (YOLO) → object detection when:
+   - Stage 4 returns FILTER (high similarity anomaly), OR
+   - Stage 4 returns PASS + Stage 3 indicates cold zone (spatial anomaly)
 
 Usage:
     from backend.core.pipeline import create_pipeline
     from backend.core.filter_heat_map import FilterHeatMap
     from backend.core.compare_events import AnomalyDetector
+    from backend.core.yolo_processor import YoloProcessor
     
     pipeline = create_pipeline(
         heatmap_filter=FilterHeatMap(),
-        anomaly_detector=AnomalyDetector()
+        anomaly_detector=AnomalyDetector(),
+        yolo_detector=YoloProcessor()
     )
     
     result = pipeline.process_alert(
@@ -121,27 +125,18 @@ class AlertProcessingPipeline:
             return result
         
         # ========== Decision Logic ==========
-        # Stage 4 FILTER → ESCALATE
+        # Determine if Stage 5 (YOLO) should run
+        run_stage_5 = False
+        
+        # Stage 4 FILTER → ESCALATE + Run YOLO
         if stage4_decision == "FILTER":
             result["final_decision"] = "ESCALATE"
             result["explanation"] = (
                 f"Stage 4: High similarity ({event_sim:.3f}) with {event_support} "
                 f"past events (anomalous). "
             )
+            run_stage_5 = True  # Stage 4 FILTER → Stage 5
             
-            # ========== STAGE 5: YOLO (if available) ==========
-            if self.yolo_detector and not motion_boxes:
-                try:
-                    yolo_result = self.yolo_detector.detect(
-                        images[1],  # Use I2
-                        confidence=0.6,
-                    )
-                    result["stage_5_result"] = yolo_result
-                    result["explanation"] += f"YOLO detected: {len(yolo_result.get('detections', []))} objects. "
-                except Exception as e:
-                    result["stage_5_result"] = {"error": str(e)}
-                    result["explanation"] += f"Stage 5 error: {e}. "
-        
         # Stage 4 DROP → DROP
         elif stage4_decision == "DROP":
             result["final_decision"] = "DROP"
@@ -155,15 +150,42 @@ class AlertProcessingPipeline:
             if next_stage_hint == 5:
                 result["final_decision"] = "ESCALATE"
                 result["explanation"] = (
-                    f"Stage 3 hint: heat_zone='{heat_zone}' → Stage 5. "
-                    f"Stage 4: Moderate match ({event_sim:.3f}). "
+                    f"Stage 3: heat_zone='{heat_zone}' (cold/anomalous) → Stage 5. "
+                    f"Stage 4: Moderate match ({event_sim:.3f}), uncertain. "
                 )
+                run_stage_5 = True  # Stage 3 cold zone → Stage 5
             else:
                 result["final_decision"] = "DROP"
                 result["explanation"] = (
-                    f"Stage 3 hint: heat_zone='{heat_zone}' → Stage 4. "
+                    f"Stage 3: heat_zone='{heat_zone}' (hot/normal) → Stage 4. "
                     f"Stage 4: Uncertain match ({event_sim:.3f}). Holding as normal."
                 )
+        
+        # ========== STAGE 5: YOLO Detection (if needed) ==========
+        if run_stage_5 and self.yolo_detector:
+            try:
+                yolo_result = self.yolo_detector.detect_objects(
+                    image=images[1],  # Use I2 (middle frame)
+                    conf_threshold=0.5,
+                )
+                result["stage_5_result"] = {
+                    "detections": yolo_result,
+                    "num_objects": len(yolo_result),
+                }
+                
+                # Add YOLO results to explanation
+                if yolo_result:
+                    detected_classes = [d["class"] for d in yolo_result]
+                    result["explanation"] += (
+                        f"Stage 5 (YOLO): Detected {len(yolo_result)} objects "
+                        f"({', '.join(set(detected_classes))}). "
+                    )
+                else:
+                    result["explanation"] += "Stage 5 (YOLO): No objects detected. "
+                    
+            except Exception as e:
+                result["stage_5_result"] = {"error": str(e)}
+                result["explanation"] += f"Stage 5 error: {e}. "
         
         return result
 
