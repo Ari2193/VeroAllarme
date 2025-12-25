@@ -30,6 +30,12 @@ data/heatmaps/*
 data/masks/*
 !data/masks/.gitkeep
 
+# Temporary test outputs
+data/test_*.jpg
+data/test_*.json
+data/visualization_*.jpg
+data/batch_test_results.json
+
 # Training data (optional - remove this line if you want to commit training data)
 # data/training/
 # !data/training/.gitkeep
