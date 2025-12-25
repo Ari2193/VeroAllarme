@@ -1,0 +1,140 @@
+# VeroAllarme - Relevance Model Training Configuration
+# 
+# This configuration file contains all hyperparameters for training
+# the relevance mask model.
+
+# ==================== Data ====================
+data_dir: "data/training/camera-events/Factory"
+output_dir: "backend/model_checkpoints"
+log_dir: "backend/logs/training"
+
+# Maximum number of sequences to use (null = all)
+max_sequences: null
+
+# Train/validation split ratio
+train_split: 0.8
+
+# ==================== Model ====================
+# Feature dimension for contrastive learning projection
+feature_dim: 128
+
+# Number of output classes (2 = relevant/not relevant)
+num_classes: 2
+
+# Use ImageNet pretrained weights for backbone
+pretrained_backbone: true
+
+# ==================== Training ====================
+# Batch size
+batch_size: 32
+
+# Number of training epochs
+num_epochs: 100
+
+# Learning rate
+learning_rate: 0.001
+
+# Weight decay (L2 regularization)
+weight_decay: 0.0001
+
+# Temperature parameter for contrastive loss (NT-Xent)
+# Lower = harder negatives, Higher = softer
+temperature: 0.07
+
+# ==================== Optimization ====================
+# Optimizer: "adam", "sgd", "adamw"
+optimizer: "adam"
+
+# Learning rate scheduler: "cosine", "step", "plateau"
+scheduler: "cosine"
+
+# Number of warmup epochs (gradual lr increase)
+warmup_epochs: 10
+
+# ==================== Data Loading ====================
+# Number of worker processes for data loading
+num_workers: 4
+
+# ==================== Checkpointing ====================
+# Save checkpoint every N epochs
+save_every: 10
+
+# Validate every N epochs (for segmentation phase)
+validate_every: 5
+
+# ==================== Device ====================
+# Device to train on: "cuda", "cpu", or null for auto-detect
+device: null
+
+# ==================== Contrastive Learning Specific ====================
+contrastive:
+  # Number of epochs for phase 1
+  epochs: 100
+  
+  # Learning rate for phase 1
+  learning_rate: 0.001
+  
+  # Batch size for phase 1
+  batch_size: 32
+
+# ==================== Segmentation Specific ====================
+segmentation:
+  # Number of epochs for phase 2
+  epochs: 50
+  
+  # Learning rate for phase 2 (usually lower than phase 1)
+  learning_rate: 0.0001
+  
+  # Batch size for phase 2
+  batch_size: 16
+  
+  # Whether to freeze encoder during fine-tuning
+  freeze_encoder: false
+  
+  # Number of initial epochs with frozen encoder
+  freeze_epochs: 5
+
+# ==================== Augmentation ====================
+augmentation:
+  # Random horizontal flip probability
+  flip_prob: 0.5
+  
+  # Color jitter (brightness, contrast, saturation, hue)
+  color_jitter: [0.4, 0.4, 0.4, 0.1]
+  
+  # Grayscale probability
+  grayscale_prob: 0.2
+  
+  # Gaussian blur kernel size
+  blur_kernel: 23
+  
+  # Random crop scale range
+  crop_scale: [0.2, 1.0]
+
+# ==================== Logging ====================
+logging:
+  # Log training metrics every N batches
+  log_interval: 10
+  
+  # Save visualization samples every N epochs
+  vis_interval: 10
+  
+  # Number of samples to visualize
+  num_vis_samples: 4
+
+# ==================== Advanced ====================
+advanced:
+  # Mixed precision training (faster on modern GPUs)
+  use_amp: false
+  
+  # Gradient clipping max norm
+  grad_clip: 1.0
+  
+  # Accumulate gradients over N batches (simulates larger batch)
+  gradient_accumulation: 1
+  
+  # Early stopping patience (epochs without improvement)
+  early_stopping_patience: 20
+  
+  # Minimum delta for improvement
+  min_delta: 0.0001

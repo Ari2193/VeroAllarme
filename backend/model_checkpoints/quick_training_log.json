@@ -1,0 +1,48 @@
+{
+  "timestamp": "2025-12-25T14:19:48.251327",
+  "config": {
+    "max_sequences": 50,
+    "batch_size": 4,
+    "contrastive_epochs": 5,
+    "segmentation_epochs": 5
+  },
+  "phase1_contrastive": {
+    "losses": [
+      0.7576839427153269,
+      0.6847563634316126,
+      0.6605832477410635,
+      0.7107818375031153,
+      0.6902356843153635
+    ],
+    "final_loss": 0.6902356843153635
+  },
+  "phase2_segmentation": {
+    "train_losses": [
+      0.8875215828418732,
+      0.8056952118873596,
+      0.769101369380951,
+      0.7484368741512298,
+      0.7313197493553162
+    ],
+    "val_losses": [
+      0.7201190193494161,
+      0.727098306020101,
+      0.7240037123362223,
+      0.7185082038243612,
+      0.7067965070406595
+    ],
+    "val_ious": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "final_iou": 0.0
+  },
+  "models": {
+    "contrastive": "model_checkpoints/quick_contrastive.pth",
+    "segmentation": "model_checkpoints/quick_segmentation.pth",
+    "complete": "model_checkpoints/quick_complete.pth"
+  }
+}
