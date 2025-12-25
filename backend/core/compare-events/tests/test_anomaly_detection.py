@@ -1,5 +1,5 @@
 """
-Tests for compare-events (Stage 4): Anomaly Detection via Event Comparison
+Tests for Stage 4: Anomaly Detection
 
 Test the memory-based filtering using embedding similarity.
 """
