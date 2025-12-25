@@ -30,6 +30,10 @@ data/heatmaps/*
 data/masks/*
 !data/masks/.gitkeep
 
+# Training data (optional - remove this line if you want to commit training data)
+# data/training/
+# !data/training/.gitkeep
+
 # Models (large files)
 models/*.pt
 models/*.pth
